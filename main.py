@@ -4,6 +4,7 @@
 #   protoc object_detection/protos/*.proto --python_out=.
 #   pip install -r requirements.txt
 
+import sys
 # import os
 # os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 
@@ -11,13 +12,12 @@ import pathlib
 import numpy as np
 import tensorflow as tf
 
-# from PIL import Image
-
 from object_detection.utils import ops as utils_ops
 from object_detection.utils import label_map_util
 from object_detection.utils import visualization_utils as vis_util
 
 import cv2
+import timeit
 
 
 def load_model(model_name):
@@ -35,10 +35,6 @@ def load_model(model_name):
 
 PATH_TO_LABELS = 'object_detection/data/mscoco_label_map.pbtxt'
 category_index = label_map_util.create_category_index_from_labelmap(PATH_TO_LABELS, use_display_name=True)
-
-# PATH_TO_TEST_IMAGES_DIR = pathlib.Path('object_detection/test_images')
-# TEST_IMAGE_PATHS = sorted(list(PATH_TO_TEST_IMAGES_DIR.glob('*.jpg')))
-# print(TEST_IMAGE_PATHS)
 
 model_name = 'ssd_mobilenet_v1_coco_2017_11_17'
 detection_model = load_model(model_name)
@@ -88,16 +84,28 @@ def show_inference(model, image, class_ids):
     vis_util.visualize_boxes_and_labels_on_image_array(image_np, boxes, classes, scores, category_index,
                                                        instance_masks=output_dict.get('detection_masks_reframed', None),
                                                        use_normalized_coordinates=True, line_thickness=2)
-    # display(Image.fromarray(image_np))
-    # Image.fromarray(image_np).show()
     return cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
 
 
-# for image_path in TEST_IMAGE_PATHS:
-#     show_inference(detection_model, np.array(Image.open(image_path)), range(1, 91))
-
 cam = cv2.VideoCapture(0)
-# cv2.namedWindow('test')
+
+if not cam.isOpened():
+    sys.stderr.write('ERROR: Camera is not opened.')
+    sys.exit()
+
+w = round(cam.get(cv2.CAP_PROP_FRAME_WIDTH))
+h = round(cam.get(cv2.CAP_PROP_FRAME_HEIGHT))
+# fps = cam.get(cv2.CAP_PROP_FPS)
+fps = 3.5
+delay = round(1000/fps)
+
+fourcc = cv2.VideoWriter_fourcc(*'DIVX')
+out = cv2.VideoWriter('output.avi', fourcc, fps, (w, h))
+
+if not out.isOpened():
+    print('File open failed!')
+    cam.release()
+    sys.exit()
 
 while True:
     ret, frame = cam.read()
@@ -106,11 +114,19 @@ while True:
         print('cannot read video')
         break
 
+    start_t = timeit.default_timer()
+
     predict_image = show_inference(detection_model, cv2.cvtColor(frame, cv2.COLOR_BGR2RGB), range(1, 91))
+
+    terminate_t = timeit.default_timer()
+
+    out.write(predict_image)
     cv2.imshow('test', predict_image)
+    print('FPS: ', 1 / (terminate_t - start_t))
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
 cam.release()
+out.release()
 cv2.destroyAllWindows()
