@@ -8,7 +8,6 @@ import sys
 import timeit
 
 import cv2
-import numpy as np
 
 from lib.video import BufferlessVideoCapture
 from lib.model import load_model

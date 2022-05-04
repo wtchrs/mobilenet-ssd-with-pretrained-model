@@ -1,5 +1,6 @@
 .idea/
 __pycache__
+venv/
 
 models/
 object_detection/
